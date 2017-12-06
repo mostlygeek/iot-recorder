@@ -13,6 +13,10 @@ type DB struct {
 	sync.RWMutex
 	db   *sql.DB
 	path string
+
+	// prevents extra data
+	prevDel  int
+	prevRecv int
 }
 
 // New creates or opens a new SQLite Database
@@ -65,10 +69,14 @@ func (d *DB) RecordDemand(ts time.Time, demand int) error {
 	return nil
 }
 
-// RecordSummation records the current KWh recieved and delivered as measured by the meter
+// RecordSummation records the current Wh (Watt hour) recieved and delivered as measured by the meter
 func (d *DB) RecordSummation(ts time.Time, delivered, received int) error {
 	d.Lock()
 	defer d.Unlock()
+
+	if d.prevDel == delivered && d.prevRecv == received {
+		return nil
+	}
 
 	dml := `INSERT INTO Summations (Timestamp, Delivered, Received)
 			VALUES (?,?,?)`
@@ -79,7 +87,8 @@ func (d *DB) RecordSummation(ts time.Time, delivered, received int) error {
 		return errors.Wrap(err, "Unable to INSERT Summation Record")
 	}
 
-	return nil
+	d.prevDel = delivered
+	d.prevRecv = received
 
 	return nil
 }

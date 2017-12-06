@@ -8,18 +8,18 @@ import (
 )
 
 type CurrentSummationMessage struct {
-	DeviceMacId        string
-	MeterMacId         string
-	Timestamp          time.Time
-	SummationDelivered int
-	SummationReceived  int
-	multiplier         float32
+	DeviceMacId string
+	MeterMacId  string
+	Timestamp   time.Time
+	Delivered   int
+	Received    int
+	multiplier  float32
 }
 
 // KHw returns how many KWh have been delivered and received by the utility
 func (c *CurrentSummationMessage) KWh() (float32, float32) {
-	return float32(c.SummationDelivered) * c.multiplier,
-		float32(c.SummationReceived) * c.multiplier
+	return float32(c.Delivered) * c.multiplier,
+		float32(c.Received) * c.multiplier
 }
 
 func (m *Message) CurrentSummation() (*CurrentSummationMessage, error) {
@@ -51,12 +51,12 @@ func (m *Message) CurrentSummation() (*CurrentSummationMessage, error) {
 	}
 
 	msg := &CurrentSummationMessage{
-		DeviceMacId:        tmp.DeviceMacId,
-		MeterMacId:         tmp.MeterMacId,
-		Timestamp:          tmp.TimeStamp.Time(),
-		SummationDelivered: int(tmp.SummationDelivered.Uint64()),
-		SummationReceived:  int(tmp.SummationReceived.Uint64()),
-		multiplier:         multiplier,
+		DeviceMacId: tmp.DeviceMacId,
+		MeterMacId:  tmp.MeterMacId,
+		Timestamp:   tmp.TimeStamp.Time(),
+		Delivered:   int(tmp.SummationDelivered.Uint64()),
+		Received:    int(tmp.SummationReceived.Uint64()),
+		multiplier:  multiplier,
 	}
 
 	return msg, nil

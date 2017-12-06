@@ -14,7 +14,7 @@ const SCHEMA_0 = `
 	CREATE TABLE Summations(
 		Timestamp INTEGER NOT NULL,
 
-		-- in KWh
+		-- in Wh
 		Delivered INTEGER NOT NULL,
 		Received INTEGER NOT NULL
 	);

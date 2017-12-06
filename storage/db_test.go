@@ -52,8 +52,7 @@ func TestRecordSummation(t *testing.T) {
 	db := tmpDB()
 	defer db.Close()
 
-	err := db.RecordSummation(timestamp, 392, 5)
-	if !assert.Nil(err) {
+	if !assert.NoError(db.RecordSummation(timestamp, 392, 5)) {
 		return
 	}
 
@@ -70,4 +69,21 @@ func TestRecordSummation(t *testing.T) {
 		assert.Equal(5, received)
 	}
 
+	// insert 2 more records to test shortcutting
+	for i := 0; i < 2; i++ {
+		// makes a row based on diff delivered
+		// skips a row due to same values
+		assert.NoError(db.RecordSummation(timestamp, 400, 5))
+	}
+	for i := 0; i < 2; i++ {
+		// makes a row based on diff recieved
+		// skips a row due to same values
+		assert.NoError(db.RecordSummation(timestamp, 400, 6))
+	}
+
+	// there should be three new records in total
+	var count int
+	if !assert.NoError(db.db.QueryRow("SELECT COUNT(1) c FROM Summations").Scan(&count)) {
+		assert.Equal(3, count)
+	}
 }
