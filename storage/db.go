@@ -2,21 +2,18 @@ package storage
 
 import (
 	"database/sql"
-	"sync"
+	"strings"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/mostlygeek/iot-recorder/storage/models"
 	"github.com/pkg/errors"
+	"github.com/volatiletech/sqlboiler/boil"
 )
 
 type DB struct {
-	sync.RWMutex
-	db   *sql.DB
+	*sql.DB
 	path string
-
-	// prevents extra data
-	prevDel  int
-	prevRecv int
 }
 
 // New creates or opens a new SQLite Database
@@ -30,65 +27,56 @@ func New(path string) (*DB, error) {
 }
 
 func (d *DB) Close() error {
-	return d.db.Close()
+	return d.DB.Close()
 }
 
 func (d *DB) open() error {
-
 	var err error
-	d.db, err = sql.Open("sqlite3", d.path)
+
+	query := []string{
+		"cache=shared",       // helps with concurrency
+		"_busy_timeout=1500", // wait up to 1500ms when db is busy, set to ~max transaction time
+		"_foreign_keys=true", // db has fk relationships, want these enabled
+		"_journal_mode=wal",  // WAL + SetMaxOpenConns(1) is better than sync.Mutex everywhere in go code
+	}
+	d.DB, err = sql.Open("sqlite3", d.path+"?"+strings.Join(query, "&"))
+
 	if err != nil {
 		return errors.Wrap(err, "Unable to open database")
 	}
 
+	d.DB.SetMaxOpenConns(1)
+
 	var userVersion int
-	if err := d.db.QueryRow("PRAGMA user_version;").Scan(&userVersion); err != nil {
+	if err := d.DB.QueryRow("PRAGMA user_version;").Scan(&userVersion); err != nil {
 		return errors.Wrap(err, "Unable to read PRAGMA user_version")
 	}
 
 	if userVersion == 0 {
-		if _, err := d.db.Exec(SCHEMA_0); err != nil {
-			return errors.Wrap(err, "Failed applying SCHEMA_0")
+		if _, err := d.DB.Exec(schema); err != nil {
+			return errors.Wrap(err, "Failed applying schema")
 		}
 	}
 
 	return nil
 }
 
-func (d *DB) RecordDemand(ts time.Time, demand int) error {
-	d.Lock()
-	defer d.Unlock()
+func (d *DB) RecordDemand(ts time.Time, demand int32) error {
 
-	dml := "INSERT INTO InstantDemand (Timestamp, Demand) VALUES (?,?)"
-
-	_, err := d.db.Exec(dml, ts.Unix(), demand)
-	if err != nil {
-		return errors.Wrap(err, "Unable to INSERT Instantaneous Demand Record")
+	rec := models.Demand{
+		Timestamp: ts.Unix(),
+		Demand:    demand,
 	}
 
-	return nil
+	return rec.Insert(d.DB, boil.Infer())
 }
 
 // RecordSummation records the current Wh (Watt hour) recieved and delivered as measured by the meter
-func (d *DB) RecordSummation(ts time.Time, delivered, received int) error {
-	d.Lock()
-	defer d.Unlock()
-
-	if d.prevDel == delivered && d.prevRecv == received {
-		return nil
+func (d *DB) RecordSummation(ts time.Time, delivered, received float32) error {
+	sum := models.Summation{
+		Timestamp: ts.Unix(),
+		Delivered: delivered,
+		Received:  received,
 	}
-
-	dml := `INSERT INTO Summations (Timestamp, Delivered, Received)
-			VALUES (?,?,?)`
-
-	_, err := d.db.Exec(dml, ts.Unix(), delivered, received)
-
-	if err != nil {
-		return errors.Wrap(err, "Unable to INSERT Summation Record")
-	}
-
-	d.prevDel = delivered
-	d.prevRecv = received
-
-	return nil
+	return sum.Insert(d.DB, boil.Infer())
 }

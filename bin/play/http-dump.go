@@ -22,6 +22,7 @@ func main() {
 					fmt.Printf("  - %s: %s\n", key, vals[0])
 				}
 		*/
+		fmt.Println(req.Method, req.URL.Path)
 		if req.Body != nil {
 			body, _ := ioutil.ReadAll(req.Body)
 
