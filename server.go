@@ -41,7 +41,7 @@ func main() {
 	lastDel := float32(0)
 	lastRec := float32(0)
 
-	router.POST("/", func(c *gin.Context) {
+	router.POST("/submit", func(c *gin.Context) {
 		if c.Request.Body == nil {
 			c.String(http.StatusBadRequest, "No POST body")
 			return
