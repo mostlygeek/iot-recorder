@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mostlygeek/iot-recorder/storage/models"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -29,21 +30,19 @@ func TestRecordDemand(t *testing.T) {
 	db := tmpDB()
 	defer db.Close()
 
-	err := db.RecordDemand(timestamp, 1992)
+	err := db.RecordDemand(timestamp, int32(1992))
 	if !assert.Nil(err) {
 		return
 	}
 
-	row := db.db.QueryRow(`SELECT Timestamp,Demand FROM InstantDemand`)
+	demands, err := models.Demands().All(db)
+	if !assert.NoError(err) {
+		return
+	}
 
-	// place holder for data
-	var (
-		ts     int64
-		demand int
-	)
-	if err := row.Scan(&ts, &demand); assert.NoError(err) {
-		assert.Equal(timestamp.Unix(), ts)
-		assert.Equal(1992, demand)
+	if assert.Len(demands, 1) {
+		assert.Equal(timestamp.Unix(), demands[0].Timestamp)
+		assert.Equal(int32(1992), demands[0].Demand)
 	}
 }
 
@@ -52,38 +51,24 @@ func TestRecordSummation(t *testing.T) {
 	db := tmpDB()
 	defer db.Close()
 
-	if !assert.NoError(db.RecordSummation(timestamp, 392, 5)) {
+	delivered := float32(5)
+	received := float32(7)
+
+	for i := 1; i <= 5; i++ {
+		if !assert.NoError(db.RecordSummation(timestamp, delivered, received)) {
+			return
+		}
+	}
+
+	sums, err := models.Summations().All(db)
+	if !assert.NoError(err) {
 		return
 	}
 
-	row := db.db.QueryRow(`SELECT Timestamp,Delivered,Received FROM Summations`)
-
-	// place holder for data
-	var (
-		ts                  int64
-		delivered, received int
-	)
-	if err := row.Scan(&ts, &delivered, &received); assert.NoError(err) {
-		assert.Equal(timestamp.Unix(), ts)
-		assert.Equal(392, delivered)
-		assert.Equal(5, received)
-	}
-
-	// insert 2 more records to test shortcutting
-	for i := 0; i < 2; i++ {
-		// makes a row based on diff delivered
-		// skips a row due to same values
-		assert.NoError(db.RecordSummation(timestamp, 400, 5))
-	}
-	for i := 0; i < 2; i++ {
-		// makes a row based on diff recieved
-		// skips a row due to same values
-		assert.NoError(db.RecordSummation(timestamp, 400, 6))
-	}
-
-	// there should be three new records in total
-	var count int
-	if !assert.NoError(db.db.QueryRow("SELECT COUNT(1) c FROM Summations").Scan(&count)) {
-		assert.Equal(3, count)
+	assert.Len(sums, 5)
+	for _, sum := range sums {
+		assert.Equal(timestamp.Unix(), sum.Timestamp)
+		assert.Equal(delivered, sum.Delivered)
+		assert.Equal(received, sum.Received)
 	}
 }
