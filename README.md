@@ -14,6 +14,14 @@ I use run this on a Raspberry PI 3 and it just keeps going.
 The server will create a new sqlite database if it doesn't exist.  You should be able
 to query the database with any sqlite tool.
 
+## Configuring the Eagle
+
+* Settings > Cloud > Click the "+" to add a new recorder
+* Name: rasp-pi-eagle-recorder
+* url: http://<ip.address>:port/submit
+
+It should take a few seconds for data to start flowing.  Don't worry if you see the red 429 status code.  There is some rate limiting done on the server side.
+
 ## Compiling a static binary
 
 ### Raspberry PI 3 B (arm-7)
